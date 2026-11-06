@@ -11,6 +11,6 @@ class CompassView(context: Context) : View(context) {
         set(value) { field = value; invalidate() }
 
     override fun onDraw(canvas: Canvas) {
-        renderer.draw(canvas, width.toFloat(), height.toFloat(), heading, null)
+        renderer.draw(canvas, width.toFloat(), height.toFloat(), heading)
     }
 }

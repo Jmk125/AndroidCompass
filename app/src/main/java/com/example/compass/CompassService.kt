@@ -40,12 +40,11 @@ class CompassService : Service() {
             val now = SystemClock.elapsedRealtime()
             var diff = abs(heading - lastPushed)
             if (diff > 180f) diff = 360f - diff
-            // Throttle widget redraws: ≥1° change and ≤5 updates per second.
+            // Throttle widget updates: ≥1° change and ≤5 per second.
             if (diff >= 1f && now - lastPushTime >= 200) {
                 lastPushed = heading
                 lastPushTime = now
-                CompassWidgetProvider.saveHeading(this, heading)
-                CompassWidgetProvider.update(this, heading = heading, live = true)
+                CompassWidgetProvider.pushHeading(this, heading)
             }
         }
     }
@@ -76,6 +75,7 @@ class CompassService : Service() {
     }
 
     override fun onDestroy() {
+        if (lastPushed >= 0f) CompassWidgetProvider.saveHeading(this, lastPushed)
         if (running) {
             running = false
             sensor.stop()

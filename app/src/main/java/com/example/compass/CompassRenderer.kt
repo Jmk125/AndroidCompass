@@ -22,16 +22,10 @@ class CompassRenderer {
     private val readout = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE; textAlign = Paint.Align.CENTER; typeface = Typeface.DEFAULT_BOLD
     }
-    private val hint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#8A93A0"); textAlign = Paint.Align.CENTER
-    }
     private val path = Path()
 
-    /**
-     * @param heading degrees clockwise from north
-     * @param hintText small caption under the readout (e.g. "Tap to start"), or null
-     */
-    fun draw(canvas: Canvas, width: Float, height: Float, heading: Float, hintText: String?) {
+    /** Background, ring, ticks and labels, with north at the top rotated by [rotation] degrees. */
+    fun drawDial(canvas: Canvas, width: Float, height: Float, rotation: Float) {
         val cx = width / 2f
         val cy = height / 2f
         val r = minOf(width, height) / 2f * 0.96f
@@ -40,9 +34,8 @@ class CompassRenderer {
         ring.strokeWidth = r * 0.015f
         canvas.drawCircle(cx, cy, r, ring)
 
-        // Rotating dial: north moves opposite to the heading.
         canvas.save()
-        canvas.rotate(-heading, cx, cy)
+        canvas.rotate(rotation, cx, cy)
         for (deg in 0 until 360 step 5) {
             val major = deg % 90 == 0
             val medium = deg % 30 == 0
@@ -73,25 +66,33 @@ class CompassRenderer {
             canvas.restore()
         }
         canvas.restore()
+    }
 
-        // Fixed pointer at the top (the direction you're facing).
+    /** The fixed red pointer at the top (the direction you're facing). */
+    fun drawPointer(canvas: Canvas, width: Float, height: Float) {
+        val cx = width / 2f
+        val cy = height / 2f
+        val r = minOf(width, height) / 2f * 0.96f
         path.reset()
         path.moveTo(cx, cy - r * 1.0f + r * 0.02f)
         path.lineTo(cx - r * 0.05f, cy - r * 0.84f)
         path.lineTo(cx + r * 0.05f, cy - r * 0.84f)
         path.close()
         canvas.drawPath(path, pointer)
+    }
 
-        // Centre readout.
-        val d = heading.roundToInt() % 360
+    /** Full compass for the in-app view. */
+    fun draw(canvas: Canvas, width: Float, height: Float, heading: Float) {
+        drawDial(canvas, width, height, -heading)
+        drawPointer(canvas, width, height)
+
+        val cx = width / 2f
+        val cy = height / 2f
+        val r = minOf(width, height) / 2f * 0.96f
         readout.textSize = r * 0.3f
-        canvas.drawText("$d°", cx, cy + r * 0.06f, readout)
+        canvas.drawText("${heading.roundToInt() % 360}°", cx, cy + r * 0.06f, readout)
         readout.textSize = r * 0.15f
         canvas.drawText(cardinal(heading), cx, cy + r * 0.26f, readout)
-        if (hintText != null) {
-            hint.textSize = r * 0.08f
-            canvas.drawText(hintText, cx, cy + r * 0.42f, hint)
-        }
     }
 
     companion object {

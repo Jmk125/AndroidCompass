@@ -8,7 +8,9 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.view.View
 import android.widget.RemoteViews
+import kotlin.math.roundToInt
 
 class CompassWidgetProvider : AppWidgetProvider() {
 
@@ -24,7 +26,6 @@ class CompassWidgetProvider : AppWidgetProvider() {
     companion object {
         private const val BITMAP_SIZE = 360
         private val renderer = CompassRenderer()
-        private var bitmap: Bitmap? = null
 
         private const val PREFS = "compass"
         private const val KEY_HEADING = "heading"
@@ -35,23 +36,29 @@ class CompassWidgetProvider : AppWidgetProvider() {
         private fun lastHeading(context: Context) =
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getFloat(KEY_HEADING, 0f)
 
-        /** Redraws every placed widget. [heading] null => last known heading, shown as idle. */
+        private fun widgetIds(context: Context, manager: AppWidgetManager) =
+            manager.getAppWidgetIds(ComponentName(context, CompassWidgetProvider::class.java))
+
+        private fun setHeading(views: RemoteViews, heading: Float) {
+            views.setFloat(R.id.dial, "setRotation", -heading)
+            views.setTextViewText(
+                R.id.readout, "${heading.roundToInt() % 360}°\n${CompassRenderer.cardinal(heading)}"
+            )
+        }
+
+        /** Full redraw (sends the dial images). Used when the widget is placed or switched on/off. */
         fun update(
             context: Context,
             manager: AppWidgetManager = AppWidgetManager.getInstance(context),
-            ids: IntArray = manager.getAppWidgetIds(ComponentName(context, CompassWidgetProvider::class.java)),
-            heading: Float? = null,
+            ids: IntArray = widgetIds(context, manager),
             live: Boolean = CompassService.running,
         ) {
             if (ids.isEmpty()) return
-            val h = heading ?: lastHeading(context)
-
-            // A fresh bitmap each time: RemoteViews won't redraw if handed the same object.
-            val bmp = Bitmap.createBitmap(BITMAP_SIZE, BITMAP_SIZE, Bitmap.Config.ARGB_8888)
-            renderer.draw(
-                Canvas(bmp), BITMAP_SIZE.toFloat(), BITMAP_SIZE.toFloat(), h,
-                if (live) null else context.getString(R.string.tap_to_start)
-            )
+            val size = BITMAP_SIZE.toFloat()
+            val dial = Bitmap.createBitmap(BITMAP_SIZE, BITMAP_SIZE, Bitmap.Config.ARGB_8888)
+            renderer.drawDial(Canvas(dial), size, size, 0f)
+            val pointer = Bitmap.createBitmap(BITMAP_SIZE, BITMAP_SIZE, Bitmap.Config.ARGB_8888)
+            renderer.drawPointer(Canvas(pointer), size, size)
 
             val tap = PendingIntent.getForegroundService(
                 context, 0,
@@ -59,10 +66,23 @@ class CompassWidgetProvider : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             val views = RemoteViews(context.packageName, R.layout.widget_compass).apply {
-                setImageViewBitmap(R.id.compass_image, bmp)
-                setOnClickPendingIntent(R.id.compass_image, tap)
+                setImageViewBitmap(R.id.dial, dial)
+                setImageViewBitmap(R.id.pointer, pointer)
+                setViewVisibility(R.id.hint, if (live) View.GONE else View.VISIBLE)
+                setHeading(this, lastHeading(context))
+                setOnClickPendingIntent(R.id.root, tap)
             }
             manager.updateAppWidget(ids, views)
+        }
+
+        /** Cheap live update: only a rotation angle and a short text string are sent. */
+        fun pushHeading(context: Context, heading: Float) {
+            val manager = AppWidgetManager.getInstance(context)
+            val ids = widgetIds(context, manager)
+            if (ids.isEmpty()) return
+            val views = RemoteViews(context.packageName, R.layout.widget_compass)
+            setHeading(views, heading)
+            manager.partiallyUpdateAppWidget(ids, views)
         }
     }
 }
