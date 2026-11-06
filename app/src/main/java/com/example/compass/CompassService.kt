@@ -27,7 +27,8 @@ class CompassService : Service() {
 
     private lateinit var sensor: HeadingSensor
     private val handler = Handler(Looper.getMainLooper())
-    private var lastPushed = -1000f
+    private var lastPushed = 0f
+    private var hasPushed = false
     private var lastPushTime = 0L
 
     private val screenOff = object : BroadcastReceiver() {
@@ -38,10 +39,12 @@ class CompassService : Service() {
         super.onCreate()
         sensor = HeadingSensor(this) { heading ->
             val now = SystemClock.elapsedRealtime()
-            var diff = abs(heading - lastPushed)
+            // Smallest angle between this reading and the last one we pushed (wraps at 360°).
+            var diff = abs(heading - lastPushed) % 360f
             if (diff > 180f) diff = 360f - diff
-            // Throttle widget updates: ≥1° change and ≤5 per second.
-            if (diff >= 1f && now - lastPushTime >= 200) {
+            // Always push the first reading, then throttle: ≥1° change and ≤5 updates per second.
+            if (!hasPushed || (diff >= 1f && now - lastPushTime >= 200)) {
+                hasPushed = true
                 lastPushed = heading
                 lastPushTime = now
                 CompassWidgetProvider.pushHeading(this, heading)
@@ -75,7 +78,7 @@ class CompassService : Service() {
     }
 
     override fun onDestroy() {
-        if (lastPushed >= 0f) CompassWidgetProvider.saveHeading(this, lastPushed)
+        if (hasPushed) CompassWidgetProvider.saveHeading(this, lastPushed)
         if (running) {
             running = false
             sensor.stop()
