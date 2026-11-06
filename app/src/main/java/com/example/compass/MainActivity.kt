@@ -4,7 +4,10 @@ import android.Manifest
 import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
@@ -21,6 +24,7 @@ class MainActivity : Activity() {
 
     private lateinit var compassView: CompassView
     private lateinit var sensor: HeadingSensor
+    private lateinit var floatingButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,6 +38,9 @@ class MainActivity : Activity() {
             text = getString(R.string.add_widget)
             setOnClickListener { requestPinWidget() }
         }
+        floatingButton = Button(this).apply {
+            setOnClickListener { toggleFloating() }
+        }
         val note = TextView(this).apply {
             text = if (sensor.isAvailable) getString(R.string.calibrate_hint) else getString(R.string.no_sensor)
             setTextColor(0xFF8A93A0.toInt())
@@ -46,6 +53,7 @@ class MainActivity : Activity() {
             setPadding(0, (24 * dp).toInt(), 0, (24 * dp).toInt())
             addView(compassView, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
             addView(note, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            addView(floatingButton, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
             addView(addWidget, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
         }
         setContentView(FrameLayout(this).apply { addView(column, MATCH_PARENT, MATCH_PARENT) })
@@ -57,8 +65,34 @@ class MainActivity : Activity() {
         }
     }
 
-    override fun onResume() { super.onResume(); sensor.start() }
+    override fun onResume() {
+        super.onResume()
+        sensor.start()
+        updateFloatingButton()
+    }
     override fun onPause() { super.onPause(); sensor.stop() }
+
+    private fun updateFloatingButton() {
+        floatingButton.setText(
+            if (FloatingCompassService.running) R.string.floating_stop else R.string.floating_start
+        )
+    }
+
+    private fun toggleFloating() {
+        if (FloatingCompassService.running) {
+            startService(Intent(this, FloatingCompassService::class.java).setAction(FloatingCompassService.ACTION_STOP))
+            floatingButton.setText(R.string.floating_start)
+            return
+        }
+        if (!Settings.canDrawOverlays(this)) {
+            Toast.makeText(this, R.string.floating_permission, Toast.LENGTH_LONG).show()
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            return
+        }
+        startForegroundService(Intent(this, FloatingCompassService::class.java))
+        floatingButton.setText(R.string.floating_stop)
+        moveTaskToBack(true) // drop to the previous app so the bubble is visible right away
+    }
 
     private fun requestPinWidget() {
         val mgr = getSystemService(AppWidgetManager::class.java)

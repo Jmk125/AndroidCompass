@@ -11,4 +11,10 @@
     <string name="notification_title">Compass widget is live</string>
     <string name="notification_text">Using the compass sensor. Stops when the screen locks.</string>
     <string name="stop">Stop</string>
+    <string name="floating_start">Show floating compass</string>
+    <string name="floating_stop">Hide floating compass</string>
+    <string name="floating_permission">Allow "Display over other apps" for Compass, then tap the button again.</string>
+    <string name="floating_channel">Floating compass</string>
+    <string name="floating_notification_title">Floating compass is on</string>
+    <string name="floating_notification_text">Drag to move, tap to resize, long-press to close.</string>
 </resources>
