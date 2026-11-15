@@ -23,6 +23,11 @@ class CompassRenderer {
         color = Color.WHITE; textAlign = Paint.Align.CENTER; typeface = Typeface.DEFAULT_BOLD
     }
     private val path = Path()
+    private val pinFill = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val pinOutline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#14171C"); style = Paint.Style.STROKE; strokeJoin = Paint.Join.ROUND
+    }
+    private val arrivedRing = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
 
     /** Background, ring, ticks and labels, with north at the top rotated by [rotation] degrees. */
     fun drawDial(canvas: Canvas, width: Float, height: Float, rotation: Float) {
@@ -81,9 +86,48 @@ class CompassRenderer {
         canvas.drawPath(path, pointer)
     }
 
-    /** Full compass for the in-app view. */
-    fun draw(canvas: Canvas, width: Float, height: Float, heading: Float) {
+    /**
+     * Pin arrows on the rim, in north-up dial coordinates (rotate with the dial).
+     * A pin you've arrived at becomes a coloured ring around the edge instead of an arrow.
+     */
+    fun drawPins(canvas: Canvas, width: Float, height: Float, markers: List<PinMarker>) {
+        if (markers.isEmpty()) return
+        val cx = width / 2f
+        val cy = height / 2f
+        val r = minOf(width, height) / 2f * 0.96f
+
+        var ring = 0
+        for (m in markers) {
+            if (!m.arrived) continue
+            arrivedRing.color = m.color
+            arrivedRing.strokeWidth = r * 0.045f
+            canvas.drawCircle(cx, cy, r * (0.975f - ring * 0.05f), arrivedRing)
+            ring++
+        }
+        pinOutline.strokeWidth = r * 0.02f
+        for (m in markers) {
+            if (m.arrived) continue
+            pinFill.color = m.color
+            canvas.save()
+            canvas.rotate(m.angle, cx, cy)
+            path.reset()
+            path.moveTo(cx, cy - r * 0.995f)
+            path.lineTo(cx - r * 0.075f, cy - r * 0.86f)
+            path.lineTo(cx + r * 0.075f, cy - r * 0.86f)
+            path.close()
+            canvas.drawPath(path, pinFill)
+            canvas.drawPath(path, pinOutline)
+            canvas.restore()
+        }
+    }
+
+    /** Full compass for the in-app view and the floating bubble. */
+    fun draw(canvas: Canvas, width: Float, height: Float, heading: Float, markers: List<PinMarker> = emptyList()) {
         drawDial(canvas, width, height, -heading)
+        canvas.save()
+        canvas.rotate(-heading, width / 2f, height / 2f)
+        drawPins(canvas, width, height, markers)
+        canvas.restore()
         drawPointer(canvas, width, height)
 
         val cx = width / 2f

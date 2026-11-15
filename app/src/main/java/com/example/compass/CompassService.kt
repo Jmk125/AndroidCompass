@@ -9,8 +9,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.ServiceInfo
-import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -31,12 +29,17 @@ class CompassService : Service() {
     private var hasPushed = false
     private var lastPushTime = 0L
 
+    private lateinit var navigator: PinNavigator
+    private var lastPinMarkers: List<PinMarker> = emptyList()
+    private var lastPinPush = 0L
+
     private val screenOff = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = stopSelf()
     }
 
     override fun onCreate() {
         super.onCreate()
+        navigator = PinNavigator(this) { onPinsChanged() }
         sensor = HeadingSensor(this) { heading ->
             val now = SystemClock.elapsedRealtime()
             // Smallest angle between this reading and the last one we pushed (wraps at 360°).
@@ -52,12 +55,34 @@ class CompassService : Service() {
         }
     }
 
+    /** Pins need location while the app is in the background, which takes "Allow all the time". */
+    private fun canLocate() = Permissions.hasFine(this) && Permissions.hasBackground(this)
+
+    private fun onPinsChanged() {
+        val markers = navigator.markers
+        val shapeChanged = markers.map { it.copy(angle = 0f) } != lastPinMarkers.map { it.copy(angle = 0f) }
+        val now = SystemClock.elapsedRealtime()
+        if (!shapeChanged) {
+            val moved = markers.indices.any { i ->
+                var d = abs(markers[i].angle - lastPinMarkers[i].angle) % 360f
+                if (d > 180f) d = 360f - d
+                d >= 2f
+            }
+            if (!moved || now - lastPinPush < 1500) return
+        }
+        lastPinMarkers = markers
+        lastPinPush = now
+        CompassWidgetProvider.pushPins(this, markers)
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Must call startForeground promptly after startForegroundService(), even if we stop right away.
-        ServiceCompat.startForeground(
-            this, NOTIFICATION_ID, buildNotification(),
-            if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
-        )
+        try {
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification(), Permissions.fgsType(canLocate()))
+        } catch (e: RuntimeException) {
+            // Location type refused (e.g. permission changed): carry on as a plain compass.
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification(), Permissions.fgsType(false))
+        }
 
         if (intent?.action == ACTION_STOP || (intent?.action == ACTION_TOGGLE && running)) {
             stopSelf()
@@ -70,6 +95,7 @@ class CompassService : Service() {
         if (!running) {
             running = true
             sensor.start()
+            if (canLocate()) navigator.start()
             registerReceiver(screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF))
             handler.postDelayed({ stopSelf() }, TIMEOUT_MS)
             CompassWidgetProvider.update(this, live = true)
@@ -82,9 +108,11 @@ class CompassService : Service() {
         if (running) {
             running = false
             sensor.stop()
+            navigator.stop()
             handler.removeCallbacksAndMessages(null)
             runCatching { unregisterReceiver(screenOff) }
         }
+        CompassWidgetProvider.pinMarkers = emptyList()
         CompassWidgetProvider.update(this, live = false)
         super.onDestroy()
     }

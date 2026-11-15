@@ -27,6 +27,9 @@ class CompassWidgetProvider : AppWidgetProvider() {
         private const val BITMAP_SIZE = 360
         private val renderer = CompassRenderer()
 
+        /** Latest pin arrows, set by the live service; empty when the widget is idle. */
+        @Volatile var pinMarkers: List<PinMarker> = emptyList()
+
         private const val PREFS = "compass"
         private const val KEY_HEADING = "heading"
 
@@ -41,6 +44,7 @@ class CompassWidgetProvider : AppWidgetProvider() {
 
         private fun setHeading(views: RemoteViews, heading: Float) {
             views.setFloat(R.id.dial, "setRotation", -heading)
+            views.setFloat(R.id.pins, "setRotation", -heading)
             views.setTextViewText(
                 R.id.readout, "${heading.roundToInt() % 360}°\n${CompassRenderer.cardinal(heading)}"
             )
@@ -57,6 +61,8 @@ class CompassWidgetProvider : AppWidgetProvider() {
             val size = BITMAP_SIZE.toFloat()
             val dial = Bitmap.createBitmap(BITMAP_SIZE, BITMAP_SIZE, Bitmap.Config.ARGB_8888)
             renderer.drawDial(Canvas(dial), size, size, 0f)
+            val pins = Bitmap.createBitmap(BITMAP_SIZE, BITMAP_SIZE, Bitmap.Config.ARGB_8888)
+            renderer.drawPins(Canvas(pins), size, size, pinMarkers)
             val pointer = Bitmap.createBitmap(BITMAP_SIZE, BITMAP_SIZE, Bitmap.Config.ARGB_8888)
             renderer.drawPointer(Canvas(pointer), size, size)
 
@@ -67,12 +73,27 @@ class CompassWidgetProvider : AppWidgetProvider() {
             )
             val views = RemoteViews(context.packageName, R.layout.widget_compass).apply {
                 setImageViewBitmap(R.id.dial, dial)
+                setImageViewBitmap(R.id.pins, pins)
                 setImageViewBitmap(R.id.pointer, pointer)
                 setViewVisibility(R.id.hint, if (live) View.GONE else View.VISIBLE)
                 setHeading(this, lastHeading(context))
                 setOnClickPendingIntent(R.id.root, tap)
             }
             manager.updateAppWidget(ids, views)
+        }
+
+        /** Redraws only the pin arrows layer (called when bearings change noticeably). */
+        fun pushPins(context: Context, markers: List<PinMarker>) {
+            pinMarkers = markers
+            val manager = AppWidgetManager.getInstance(context)
+            val ids = widgetIds(context, manager)
+            if (ids.isEmpty()) return
+            val size = BITMAP_SIZE.toFloat()
+            val bmp = Bitmap.createBitmap(BITMAP_SIZE, BITMAP_SIZE, Bitmap.Config.ARGB_8888)
+            renderer.drawPins(Canvas(bmp), size, size, markers)
+            val views = RemoteViews(context.packageName, R.layout.widget_compass)
+            views.setImageViewBitmap(R.id.pins, bmp)
+            manager.partiallyUpdateAppWidget(ids, views)
         }
 
         /** Cheap live update: only a rotation angle and a short text string are sent. */

@@ -12,6 +12,14 @@
         android:contentDescription="@string/app_name"
         android:scaleType="fitCenter" />
 
+    <!-- Pin arrows: drawn north-up and rotated together with the dial. -->
+    <ImageView
+        android:id="@+id/pins"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:scaleType="fitCenter" />
+
     <ImageView
         android:id="@+id/pointer"
         android:layout_width="match_parent"

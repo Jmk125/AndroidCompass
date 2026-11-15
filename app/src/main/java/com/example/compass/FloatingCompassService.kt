@@ -9,9 +9,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
-import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -32,6 +30,7 @@ class FloatingCompassService : Service() {
     private lateinit var windowManager: WindowManager
     private lateinit var compassView: CompassView
     private lateinit var sensor: HeadingSensor
+    private lateinit var navigator: PinNavigator
     private lateinit var params: WindowManager.LayoutParams
     private val handler = Handler(Looper.getMainLooper())
     private var added = false
@@ -40,7 +39,11 @@ class FloatingCompassService : Service() {
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             // Don't burn battery on the sensor while the screen is off.
-            if (intent.action == Intent.ACTION_SCREEN_OFF) sensor.stop() else sensor.start()
+            if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                sensor.stop(); navigator.stop()
+            } else {
+                sensor.start(); navigator.start()
+            }
         }
     }
 
@@ -49,20 +52,30 @@ class FloatingCompassService : Service() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         compassView = CompassView(this)
         sensor = HeadingSensor(this) { compassView.heading = it }
+        navigator = PinNavigator(this) { compassView.markers = navigator.markers }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        ServiceCompat.startForeground(
-            this, NOTIFICATION_ID, buildNotification(),
-            if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
-        )
-        if (intent?.action == ACTION_STOP || !android.provider.Settings.canDrawOverlays(this) || !sensor.isAvailable) {
+        if (intent?.action == ACTION_STOP) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        // Started from the app while it's visible, so location access is allowed if permitted.
+        try {
+            ServiceCompat.startForeground(
+                this, NOTIFICATION_ID, buildNotification(), Permissions.fgsType(Permissions.hasFine(this))
+            )
+        } catch (e: RuntimeException) {
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification(), Permissions.fgsType(false))
+        }
+        if (!android.provider.Settings.canDrawOverlays(this) || !sensor.isAvailable) {
             stopSelf()
             return START_NOT_STICKY
         }
         if (!added) {
             addBubble()
             sensor.start()
+            navigator.start()
             registerReceiver(screenReceiver, IntentFilter().apply {
                 addAction(Intent.ACTION_SCREEN_OFF)
                 addAction(Intent.ACTION_SCREEN_ON)
@@ -136,6 +149,7 @@ class FloatingCompassService : Service() {
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
         sensor.stop()
+        navigator.stop()
         if (added) {
             runCatching { windowManager.removeView(compassView) }
             runCatching { unregisterReceiver(screenReceiver) }

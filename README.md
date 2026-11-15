@@ -16,3 +16,11 @@ APK in GitHub Actions — download it from the run's artifacts.
 ## Add the widget
 Use the **Add home screen widget** button in the app, or long-press the home
 screen → Widgets → Compass.
+
+## Pins
+Tap **Pin this location** to save where you're standing, then walk away: a small
+coloured arrow on the rim of the compass (app, widget and floating bubble) points
+back to it, corrected for magnetic vs. true north. Within ~15 m the arrow turns
+into a coloured ring and the phone vibrates. Names only appear in the app.
+To see pins on the **widget**, set the app's location permission to
+"Allow all the time" (Android only allows widget taps to use location that way).

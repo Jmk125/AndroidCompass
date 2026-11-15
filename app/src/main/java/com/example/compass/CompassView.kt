@@ -10,7 +10,10 @@ class CompassView(context: Context) : View(context) {
     var heading: Float = 0f
         set(value) { field = value; invalidate() }
 
+    var markers: List<PinMarker> = emptyList()
+        set(value) { field = value; invalidate() }
+
     override fun onDraw(canvas: Canvas) {
-        renderer.draw(canvas, width.toFloat(), height.toFloat(), heading)
+        renderer.draw(canvas, width.toFloat(), height.toFloat(), heading, markers)
     }
 }
