@@ -9,18 +9,28 @@ import android.os.Bundle
 import android.os.Looper
 import android.os.SystemClock
 
-/** Plain LocationManager tracker (GPS + network); no Play Services needed. */
-class LocationTracker(private val context: Context, private val onFix: (Location) -> Unit) : LocationListener {
+/**
+ * Plain LocationManager tracker; no Play Services needed.
+ * GPS is preferred. Wi-Fi/cell ("network") fixes are only a fallback because they can be
+ * tens or hundreds of metres off and barely move as you walk.
+ */
+class LocationTracker(private val context: Context, private val onFix: () -> Unit) : LocationListener {
 
     private val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    private var gps: Location? = null
+    private var network: Location? = null
 
-    var last: Location? = null
-        private set
+    private fun ageMs(l: Location) = (SystemClock.elapsedRealtimeNanos() - l.elapsedRealtimeNanos) / 1_000_000L
 
-    /** The latest fix, only if it's recent enough to pin from. */
-    fun freshLocation(): Location? = last?.takeIf {
-        SystemClock.elapsedRealtimeNanos() - it.elapsedRealtimeNanos < 30_000_000_000L
-    }
+    /** A recent GPS fix, else a recent network fix that isn't hopeless, else null. */
+    val last: Location?
+        get() {
+            gps?.let { if (ageMs(it) < 15_000L) return it }
+            network?.let { if (ageMs(it) < 30_000L && it.accuracy <= 100f) return it }
+            return null
+        }
+
+    val isGps: Boolean get() = last?.provider == LocationManager.GPS_PROVIDER
 
     @SuppressLint("MissingPermission")
     fun start() {
@@ -40,17 +50,15 @@ class LocationTracker(private val context: Context, private val onFix: (Location
     }
 
     override fun onLocationChanged(location: Location) {
-        val cur = last
-        // Take it if it's from the same source, more accurate, or the current fix has gone stale.
-        if (cur == null || location.provider == cur.provider || location.accuracy <= cur.accuracy ||
-            location.time - cur.time > 10_000
-        ) {
-            last = location
-            onFix(location)
+        when (location.provider) {
+            LocationManager.GPS_PROVIDER -> gps = location
+            LocationManager.NETWORK_PROVIDER -> network = location
+            else -> return
         }
+        onFix()
     }
 
-    // Implemented explicitly: on Android 8–10 the system still calls these.
+    // Implemented explicitly: on Android 8-10 the system still calls these.
     override fun onProviderEnabled(provider: String) {}
     override fun onProviderDisabled(provider: String) {}
     @Deprecated("Deprecated in Java")

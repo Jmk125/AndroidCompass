@@ -143,7 +143,8 @@ class MainActivity : Activity() {
         statusText.text = when {
             !Permissions.hasFine(this) -> getString(R.string.loc_off)
             loc == null -> getString(R.string.loc_waiting)
-            else -> getString(R.string.loc_accuracy, loc.accuracy.roundToInt())
+            navigator.isGps -> getString(R.string.loc_accuracy, loc.accuracy.roundToInt())
+            else -> getString(R.string.loc_weak, loc.accuracy.roundToInt())
         }
     }
 
@@ -160,10 +161,22 @@ class MainActivity : Activity() {
             Toast.makeText(this, R.string.waiting_gps, Toast.LENGTH_LONG).show()
             return
         }
-        val initial = getString(R.string.default_pin_name, PinStore.load(this).size + 1)
-        promptName(initial) { name ->
-            PinStore.add(this, name, loc.latitude, loc.longitude)
-            pinsChanged()
+        val savePin = {
+            val initial = getString(R.string.default_pin_name, PinStore.load(this).size + 1)
+            promptName(initial) { name ->
+                PinStore.add(this, name, loc.latitude, loc.longitude)
+                pinsChanged()
+            }
+        }
+        if (navigator.isGps && loc.accuracy <= 30f) {
+            savePin()
+        } else {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.weak_title)
+                .setMessage(getString(R.string.weak_message, loc.accuracy.roundToInt()))
+                .setPositiveButton(R.string.pin_anyway) { _, _ -> savePin() }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
         }
     }
 

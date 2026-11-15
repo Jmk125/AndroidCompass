@@ -5,8 +5,8 @@ import android.hardware.GeomagneticField
 import android.location.Location
 import android.os.VibrationEffect
 import android.os.Vibrator
-import kotlin.math.max
-import kotlin.math.min
+import android.os.Handler
+import android.os.Looper
 
 /** Where a pin arrow sits on the (magnetic-north-up) dial. */
 data class PinMarker(val angle: Float, val color: Int, val arrived: Boolean)
@@ -22,7 +22,14 @@ class PinNavigator(private val context: Context, private val onChange: () -> Uni
         val arrived: Boolean,
     )
 
-    private val tracker = LocationTracker(context) { recompute(it) }
+    private val tracker = LocationTracker(context) { recompute(location) }
+    private val handler = Handler(Looper.getMainLooper())
+    private val tick = object : Runnable {
+        override fun run() {
+            recompute(location) // notice when fixes go stale even if no new ones arrive
+            handler.postDelayed(this, 5000)
+        }
+    }
     private val arrivedIds = mutableSetOf<Long>()
 
     // Pins we've seen from outside the arrival radius. A pin created where you stand
@@ -33,7 +40,8 @@ class PinNavigator(private val context: Context, private val onChange: () -> Uni
         private set
 
     val location: Location? get() = tracker.last
-    fun freshLocation(): Location? = tracker.freshLocation()
+    val isGps: Boolean get() = tracker.isGps
+    fun freshLocation(): Location? = tracker.last
 
     val markers: List<PinMarker>
         get() = statuses.map { PinMarker(it.magneticBearing, it.pin.color, it.arrived) }
@@ -41,12 +49,17 @@ class PinNavigator(private val context: Context, private val onChange: () -> Uni
     fun start() {
         tracker.start()
         refresh()
+        handler.removeCallbacks(tick)
+        handler.postDelayed(tick, 5000)
     }
 
-    fun stop() = tracker.stop()
+    fun stop() {
+        handler.removeCallbacks(tick)
+        tracker.stop()
+    }
 
     /** Re-evaluate after pins were added/edited/removed. */
-    fun refresh() = recompute(tracker.last)
+    fun refresh() = recompute(location)
 
     private fun recompute(loc: Location?) {
         if (loc == null) {
@@ -57,8 +70,6 @@ class PinNavigator(private val context: Context, private val onChange: () -> Uni
         val declination = GeomagneticField(
             loc.latitude.toFloat(), loc.longitude.toFloat(), loc.altitude.toFloat(), System.currentTimeMillis()
         ).declination
-        // Poor fixes get a bit more slack, capped so "arrived" can't mean 100 m away.
-        val arriveRadius = max(15f, min(loc.accuracy, 30f))
         val result = FloatArray(3)
         val pins = PinStore.load(context)
         val liveIds = pins.map { it.id }.toSet()
@@ -72,7 +83,9 @@ class PinNavigator(private val context: Context, private val onChange: () -> Uni
             // The dial is magnetic-north-up, so convert the true bearing to a magnetic one.
             val magnetic = ((trueBearing - declination) % 360f + 360f) % 360f
             val wasArrived = pin.id in arrivedIds
-            val arrived = distance <= if (wasArrived) arriveRadius + 10f else arriveRadius
+            // Fixed, predictable radii; a poor fix never counts as "arrived" (and can't hold it either).
+            val arrived = if (wasArrived) loc.accuracy <= 40f && distance <= 25f
+            else loc.accuracy <= 20f && distance <= 15f
             if (arrived && !wasArrived) {
                 arrivedIds += pin.id
                 if (pin.id in seenAway) buzz()
