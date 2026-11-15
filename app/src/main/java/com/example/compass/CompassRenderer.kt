@@ -88,7 +88,7 @@ class CompassRenderer {
 
     /**
      * Pin arrows on the rim, in north-up dial coordinates (rotate with the dial).
-     * A pin you've arrived at becomes a coloured ring around the edge instead of an arrow.
+     * Arrows always stay; a pin you're standing at also gets a coloured ring around the edge.
      */
     fun drawPins(canvas: Canvas, width: Float, height: Float, markers: List<PinMarker>) {
         if (markers.isEmpty()) return
@@ -106,7 +106,6 @@ class CompassRenderer {
         }
         pinOutline.strokeWidth = r * 0.02f
         for (m in markers) {
-            if (m.arrived) continue
             pinFill.color = m.color
             canvas.save()
             canvas.rotate(m.angle, cx, cy)

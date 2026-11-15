@@ -186,7 +186,7 @@ class MainActivity : Activity() {
             val status = navigator.statuses.firstOrNull { it.pin.id == pin.id }
             val subtitle = when {
                 status == null -> getString(R.string.pin_waiting)
-                status.arrived -> getString(R.string.pin_here_now)
+                status.arrived -> "${getString(R.string.pin_here_now)} · ${formatDistance(status.distance)}"
                 else -> "${formatDistance(status.distance)} · ${CompassRenderer.cardinal(status.trueBearing)}"
             }
             val swatch = View(this).apply {

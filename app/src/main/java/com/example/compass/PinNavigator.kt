@@ -25,6 +25,10 @@ class PinNavigator(private val context: Context, private val onChange: () -> Uni
     private val tracker = LocationTracker(context) { recompute(it) }
     private val arrivedIds = mutableSetOf<Long>()
 
+    // Pins we've seen from outside the arrival radius. A pin created where you stand
+    // starts "arrived" but silent; only a genuine arrival after being away buzzes.
+    private val seenAway = mutableSetOf<Long>()
+
     var statuses: List<Status> = emptyList()
         private set
 
@@ -57,7 +61,9 @@ class PinNavigator(private val context: Context, private val onChange: () -> Uni
         val arriveRadius = max(15f, min(loc.accuracy, 30f))
         val result = FloatArray(3)
         val pins = PinStore.load(context)
-        arrivedIds.retainAll(pins.map { it.id }.toSet())
+        val liveIds = pins.map { it.id }.toSet()
+        arrivedIds.retainAll(liveIds)
+        seenAway.retainAll(liveIds)
 
         statuses = pins.map { pin ->
             Location.distanceBetween(loc.latitude, loc.longitude, pin.lat, pin.lon, result)
@@ -69,10 +75,11 @@ class PinNavigator(private val context: Context, private val onChange: () -> Uni
             val arrived = distance <= if (wasArrived) arriveRadius + 10f else arriveRadius
             if (arrived && !wasArrived) {
                 arrivedIds += pin.id
-                buzz()
+                if (pin.id in seenAway) buzz()
             } else if (!arrived && wasArrived) {
                 arrivedIds -= pin.id
             }
+            if (!arrived) seenAway += pin.id
             Status(pin, distance, trueBearing, magnetic, arrived)
         }
         onChange()
