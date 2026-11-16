@@ -38,4 +38,12 @@
     <string name="weak_title">Weak location</string>
     <string name="weak_message">This location could be off by about %1$d m, so the pin may be misplaced by that much. Wait for a GPS fix for a better pin.</string>
     <string name="pin_anyway">Pin anyway</string>
+    <string name="tab_compass">Compass</string>
+    <string name="tab_radar">Radar</string>
+    <string name="radar_heading_up">Heading up</string>
+    <string name="radar_north_up">North up</string>
+    <string name="radar_auto">auto zoom</string>
+    <string name="radar_hint">Tap: zoom · Hold: heading / north up</string>
+    <string name="radar_waiting">Waiting for GPS…</string>
+    <string name="radar_no_pins">Pin a location to see it here</string>
 </resources>

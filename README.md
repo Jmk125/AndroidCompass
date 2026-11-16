@@ -25,3 +25,8 @@ you delete the pin; within ~15 m a coloured ring also lights up around the dial
 and the phone vibrates. Names only appear in the app.
 To see pins on the **widget**, set the app's location permission to
 "Allow all the time" (Android only allows widget taps to use location that way).
+
+## Radar
+Switch to the **Radar** tab for an offline, to-scale view: you in the middle, pins as
+coloured dots (with names) at their real distance and direction. Tap to change zoom,
+long-press to switch between heading-up and north-up. No map data or internet needed.

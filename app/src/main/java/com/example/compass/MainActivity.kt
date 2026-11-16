@@ -29,6 +29,9 @@ import kotlin.math.roundToInt
 class MainActivity : Activity() {
 
     private lateinit var compassView: CompassView
+    private lateinit var radarView: RadarView
+    private lateinit var compassTab: Button
+    private lateinit var radarTab: Button
     private lateinit var sensor: HeadingSensor
     private lateinit var navigator: PinNavigator
     private lateinit var floatingButton: Button
@@ -43,9 +46,15 @@ class MainActivity : Activity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         compassView = CompassView(this)
-        sensor = HeadingSensor(this) { compassView.heading = it }
+        radarView = RadarView(this)
+        sensor = HeadingSensor(this) {
+            compassView.heading = it
+            radarView.heading = it
+        }
         navigator = PinNavigator(this) {
             compassView.markers = navigator.markers
+            radarView.statuses = navigator.statuses
+            radarView.hasLocation = navigator.location != null
             updateStatus()
             refreshPins()
         }
@@ -96,13 +105,33 @@ class MainActivity : Activity() {
             addView(addWidget, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
             addView(note, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
+        compassTab = Button(this).apply {
+            setText(R.string.tab_compass)
+            setOnClickListener { showView(radar = false) }
+        }
+        radarTab = Button(this).apply {
+            setText(R.string.tab_radar)
+            setOnClickListener { showView(radar = true) }
+        }
+        val tabs = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), 0, dp(16), 0)
+            addView(compassTab, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+            addView(radarTab, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+        }
+        val viewFrame = FrameLayout(this).apply {
+            addView(compassView, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+            addView(radarView, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(32), 0, 0)
-            addView(compassView, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
+            addView(tabs, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            addView(viewFrame, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
             addView(ScrollView(this@MainActivity).apply { addView(content) }, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
         }
         setContentView(root)
+        showView(radar = getSharedPreferences("ui", MODE_PRIVATE).getBoolean("radar", false))
 
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -134,6 +163,14 @@ class MainActivity : Activity() {
             navigator.start()
             onResume()
         }
+    }
+
+    private fun showView(radar: Boolean) {
+        radarView.visibility = if (radar) View.VISIBLE else View.GONE
+        compassView.visibility = if (radar) View.GONE else View.VISIBLE
+        radarTab.alpha = if (radar) 1f else 0.5f
+        compassTab.alpha = if (radar) 0.5f else 1f
+        getSharedPreferences("ui", MODE_PRIVATE).edit().putBoolean("radar", radar).apply()
     }
 
     // ---------- pins ----------
