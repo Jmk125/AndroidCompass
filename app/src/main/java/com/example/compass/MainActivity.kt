@@ -93,6 +93,10 @@ class MainActivity : Activity() {
             setPadding(0, dp(12), 0, 0)
         }
 
+        val settingsButton = Button(this).apply {
+            setText(R.string.settings)
+            setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
+        }
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(8), dp(16), dp(64))
@@ -104,6 +108,7 @@ class MainActivity : Activity() {
             addView(floatingButton, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
             addView(addWidget, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
             addView(note, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            addView(settingsButton, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
         compassTab = Button(this).apply {
             setText(R.string.tab_compass)
@@ -237,7 +242,7 @@ class MainActivity : Activity() {
             val subtitle = when {
                 status == null -> getString(R.string.pin_waiting)
                 status.arrived -> "${getString(R.string.pin_here_now)} · ${formatDistance(status.distance)}"
-                else -> "${formatDistance(status.distance)} · ${CompassRenderer.cardinal(status.trueBearing)}"
+                else -> "${formatDistance(status.distance)} · ${cardinalOf(status.trueBearing)}"
             }
             val swatch = View(this).apply {
                 background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(pin.color) }

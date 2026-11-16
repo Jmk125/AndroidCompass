@@ -24,14 +24,25 @@ class CompassWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
-        private const val BITMAP_SIZE = 360
-        private val renderer = CompassRenderer()
+        private const val BITMAP_SIZE = 384 // a multiple of 64 so the pixel style scales cleanly
 
         /** Latest pin arrows, set by the live service; empty when the widget is idle. */
         @Volatile var pinMarkers: List<PinMarker> = emptyList()
 
         private const val PREFS = "compass"
         private const val KEY_HEADING = "heading"
+
+        private var cachedStyle: CompassStyle? = null
+        private var cachedRenderer: StyleRenderer? = null
+
+        private fun rendererFor(context: Context, style: CompassStyle): StyleRenderer {
+            val existing = cachedRenderer
+            if (existing != null && cachedStyle == style) return existing
+            val fresh = style.createRenderer(context.applicationContext)
+            cachedStyle = style
+            cachedRenderer = fresh
+            return fresh
+        }
 
         fun saveHeading(context: Context, heading: Float) =
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putFloat(KEY_HEADING, heading).apply()
@@ -45,12 +56,16 @@ class CompassWidgetProvider : AppWidgetProvider() {
         private fun setHeading(views: RemoteViews, heading: Float) {
             views.setFloat(R.id.dial, "setRotation", -heading)
             views.setFloat(R.id.pins, "setRotation", -heading)
-            views.setTextViewText(
-                R.id.readout, "${heading.roundToInt() % 360}°\n${CompassRenderer.cardinal(heading)}"
-            )
+            views.setTextViewText(R.id.readout, "${heading.roundToInt() % 360}°\n${cardinalOf(heading)}")
         }
 
-        /** Full redraw (sends the dial images). Used when the widget is placed or switched on/off. */
+        private fun layer(draw: (Canvas, Float) -> Unit): Bitmap {
+            val bmp = Bitmap.createBitmap(BITMAP_SIZE, BITMAP_SIZE, Bitmap.Config.ARGB_8888)
+            draw(Canvas(bmp), BITMAP_SIZE.toFloat())
+            return bmp
+        }
+
+        /** Full redraw (sends the dial images). Used when the widget is placed, switched on/off or restyled. */
         fun update(
             context: Context,
             manager: AppWidgetManager = AppWidgetManager.getInstance(context),
@@ -58,23 +73,22 @@ class CompassWidgetProvider : AppWidgetProvider() {
             live: Boolean = CompassService.running,
         ) {
             if (ids.isEmpty()) return
-            val size = BITMAP_SIZE.toFloat()
-            val dial = Bitmap.createBitmap(BITMAP_SIZE, BITMAP_SIZE, Bitmap.Config.ARGB_8888)
-            renderer.drawDial(Canvas(dial), size, size, 0f)
-            val pins = Bitmap.createBitmap(BITMAP_SIZE, BITMAP_SIZE, Bitmap.Config.ARGB_8888)
-            renderer.drawPins(Canvas(pins), size, size, pinMarkers)
-            val pointer = Bitmap.createBitmap(BITMAP_SIZE, BITMAP_SIZE, Bitmap.Config.ARGB_8888)
-            renderer.drawPointer(Canvas(pointer), size, size)
+            val style = StylePrefs.get(context)
+            val renderer = rendererFor(context, style)
+
+            val dial = layer { cv, s -> renderer.drawFace(cv, s); renderer.drawContent(cv, s, 0f) }
+            val pins = layer { cv, s -> renderer.drawPins(cv, s, pinMarkers, 0f) }
+            val top = layer { cv, s -> renderer.drawTop(cv, s, true) }
 
             val tap = PendingIntent.getForegroundService(
                 context, 0,
                 Intent(context, CompassService::class.java).setAction(CompassService.ACTION_TOGGLE),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            val views = RemoteViews(context.packageName, R.layout.widget_compass).apply {
+            val views = RemoteViews(context.packageName, style.widgetLayout()).apply {
                 setImageViewBitmap(R.id.dial, dial)
                 setImageViewBitmap(R.id.pins, pins)
-                setImageViewBitmap(R.id.pointer, pointer)
+                setImageViewBitmap(R.id.pointer, top)
                 setViewVisibility(R.id.hint, if (live) View.GONE else View.VISIBLE)
                 setHeading(this, lastHeading(context))
                 setOnClickPendingIntent(R.id.root, tap)
@@ -88,10 +102,10 @@ class CompassWidgetProvider : AppWidgetProvider() {
             val manager = AppWidgetManager.getInstance(context)
             val ids = widgetIds(context, manager)
             if (ids.isEmpty()) return
-            val size = BITMAP_SIZE.toFloat()
-            val bmp = Bitmap.createBitmap(BITMAP_SIZE, BITMAP_SIZE, Bitmap.Config.ARGB_8888)
-            renderer.drawPins(Canvas(bmp), size, size, markers)
-            val views = RemoteViews(context.packageName, R.layout.widget_compass)
+            val style = StylePrefs.get(context)
+            val renderer = rendererFor(context, style)
+            val bmp = layer { cv, s -> renderer.drawPins(cv, s, markers, 0f) }
+            val views = RemoteViews(context.packageName, style.widgetLayout())
             views.setImageViewBitmap(R.id.pins, bmp)
             manager.partiallyUpdateAppWidget(ids, views)
         }
@@ -101,7 +115,7 @@ class CompassWidgetProvider : AppWidgetProvider() {
             val manager = AppWidgetManager.getInstance(context)
             val ids = widgetIds(context, manager)
             if (ids.isEmpty()) return
-            val views = RemoteViews(context.packageName, R.layout.widget_compass)
+            val views = RemoteViews(context.packageName, StylePrefs.get(context).widgetLayout())
             setHeading(views, heading)
             manager.partiallyUpdateAppWidget(ids, views)
         }

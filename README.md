@@ -30,3 +30,11 @@ To see pins on the **widget**, set the app's location permission to
 Switch to the **Radar** tab for an offline, to-scale view: you in the middle, pins as
 coloured dots (with names) at their real distance and direction. Tap to change zoom,
 long-press to switch between heading-up and north-up. No map data or internet needed.
+
+## Styles
+**Settings** (button at the bottom of the main screen) switches the compass between
+Modern (default), Gothic, Pirate, Old Western and Pixel Art. The style applies to the
+app, the floating compass and the widget.
+
+Fonts bundled (SIL Open Font License 1.1): UnifrakturCook (Gothic), Pirata One (Pirate),
+Rye (Old Western), Silkscreen (Pixel Art).

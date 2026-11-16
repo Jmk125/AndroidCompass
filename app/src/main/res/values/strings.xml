@@ -46,4 +46,7 @@
     <string name="radar_hint">Tap: zoom · Hold: heading / north up</string>
     <string name="radar_waiting">Waiting for GPS…</string>
     <string name="radar_no_pins">Pin a location to see it here</string>
+    <string name="settings">Settings</string>
+    <string name="compass_style">Compass style</string>
+    <string name="compass_style_hint">Applies to the app, the floating compass and the home screen widget.</string>
 </resources>
