@@ -11,20 +11,20 @@
     <string name="notification_title">Compass widget is live</string>
     <string name="notification_text">Using the compass sensor. Stops when the screen locks.</string>
     <string name="stop">Stop</string>
-    <string name="floating_start">Show floating compass</string>
-    <string name="floating_stop">Hide floating compass</string>
+    <string name="floating_start">Float compass</string>
+    <string name="floating_stop">Stop floating</string>
     <string name="floating_permission">Allow \"Display over other apps\" for Compass, then tap the button again.</string>
     <string name="floating_channel">Floating compass</string>
     <string name="floating_notification_title">Floating compass is on</string>
     <string name="floating_notification_text">Drag to move, tap to resize, long-press to close.</string>
     <string name="pin_here">Pin this location</string>
     <string name="pins_title">Pins</string>
-    <string name="no_pins">No pins yet. Stand where you want to come back to and tap \"Pin this location\".</string>
+    <string name="no_pins">No pins yet</string>
     <string name="name_pin">Name this pin</string>
     <string name="default_pin_name">Pin %1$d</string>
     <string name="waiting_gps">Waiting for a GPS fix. Try again in a few seconds, ideally with a clear view of the sky.</string>
-    <string name="loc_off">Location is off. Tap \"Pin this location\" to allow it.</string>
-    <string name="loc_waiting">Searching for GPS… (works best outdoors)</string>
+    <string name="loc_off">Location off</string>
+    <string name="loc_waiting">Searching for GPS…</string>
     <string name="loc_accuracy">GPS accuracy: about %1$d m</string>
     <string name="pin_waiting">Waiting for location…</string>
     <string name="pin_here_now">You\'re here</string>
@@ -32,9 +32,9 @@
     <string name="change_color">Change color</string>
     <string name="delete">Delete</string>
     <string name="delete_confirm">Delete \"%1$s\"?</string>
-    <string name="pins_on_widget">Show pins on the widget (allow location \"all the time\")</string>
+    <string name="pins_on_widget">Show pins on the widget</string>
     <string name="pins_on_widget_hint">Open Permissions → Location, then choose \"Allow all the time\".</string>
-    <string name="loc_weak">Weak location (Wi-Fi/cell), about %1$d m off. Step outside for GPS.</string>
+    <string name="loc_weak">Weak signal, about %1$d m off</string>
     <string name="weak_title">Weak location</string>
     <string name="weak_message">This location could be off by about %1$d m, so the pin may be misplaced by that much. Wait for a GPS fix for a better pin.</string>
     <string name="pin_anyway">Pin anyway</string>
@@ -49,4 +49,6 @@
     <string name="settings">Settings</string>
     <string name="compass_style">Compass style</string>
     <string name="compass_style_hint">Applies to the app, the floating compass and the home screen widget.</string>
+    <string name="widget_section">Home screen widget</string>
+    <string name="widget_hint">Tap the widget to turn it on. It switches off when the screen locks or after 5 minutes.</string>
 </resources>

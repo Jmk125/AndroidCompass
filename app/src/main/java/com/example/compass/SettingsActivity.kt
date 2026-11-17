@@ -1,6 +1,13 @@
 package com.example.compass
 
 import android.app.Activity
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import android.widget.Button
+import android.widget.Toast
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.drawable.GradientDrawable
@@ -17,6 +24,7 @@ import android.widget.TextView
 class SettingsActivity : Activity() {
 
     private lateinit var rows: Map<CompassStyle, LinearLayout>
+    private lateinit var backgroundButton: Button
     private val accent = 0xFFFF5A4D.toInt()
     private val gray = 0xFF8A93A0.toInt()
 
@@ -68,8 +76,53 @@ class SettingsActivity : Activity() {
             built[style] = row
         }
         rows = built
+
+        column.addView(TextView(this).apply {
+            setText(R.string.widget_section)
+            setTextColor(0xFFFFFFFF.toInt()); textSize = 18f
+            setPadding(0, dp(20), 0, dp(2))
+        })
+        column.addView(TextView(this).apply {
+            setText(R.string.widget_hint)
+            setTextColor(gray)
+            setPadding(0, 0, 0, dp(8))
+        })
+        column.addView(Button(this).apply {
+            setText(R.string.add_widget)
+            setOnClickListener { requestPinWidget() }
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        backgroundButton = Button(this).apply {
+            setText(R.string.pins_on_widget)
+            setOnClickListener {
+                Toast.makeText(this@SettingsActivity, R.string.pins_on_widget_hint, Toast.LENGTH_LONG).show()
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+            }
+        }
+        column.addView(backgroundButton, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        column.addView(TextView(this).apply {
+            setText(R.string.calibrate_hint)
+            setTextColor(gray)
+            setPadding(0, dp(20), 0, 0)
+        })
+
         setContentView(ScrollView(this).apply { addView(column) })
         refresh()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Only offer this once location is allowed but not yet "all the time".
+        backgroundButton.visibility =
+            if (Permissions.hasFine(this) && !Permissions.hasBackground(this)) View.VISIBLE else View.GONE
+    }
+
+    private fun requestPinWidget() {
+        val mgr = getSystemService(AppWidgetManager::class.java)
+        if (mgr.isRequestPinAppWidgetSupported) {
+            mgr.requestPinAppWidget(ComponentName(this, CompassWidgetProvider::class.java), null, null)
+        } else {
+            Toast.makeText(this, R.string.add_widget_manual, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun choose(style: CompassStyle) {

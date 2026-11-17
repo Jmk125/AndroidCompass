@@ -38,7 +38,6 @@ class MainActivity : Activity() {
     private lateinit var sensor: HeadingSensor
     private lateinit var navigator: PinNavigator
     private lateinit var floatingButton: Button
-    private lateinit var backgroundButton: Button
     private lateinit var statusText: TextView
     private lateinit var pinsContainer: LinearLayout
 
@@ -68,50 +67,24 @@ class MainActivity : Activity() {
             setText(R.string.pin_here)
             setOnClickListener { pinHere() }
         }
-        val pinsTitle = TextView(this).apply {
-            setText(R.string.pins_title)
-            setTextColor(0xFFFFFFFF.toInt())
-            textSize = 20f
-            setPadding(0, dp(16), 0, dp(4))
-        }
         pinsContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        backgroundButton = Button(this).apply {
-            setText(R.string.pins_on_widget)
-            setOnClickListener {
-                Toast.makeText(this@MainActivity, R.string.pins_on_widget_hint, Toast.LENGTH_LONG).show()
-                startActivity(
-                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
-                )
-            }
-        }
         floatingButton = Button(this).apply { setOnClickListener { toggleFloating() } }
-        val addWidget = Button(this).apply {
-            setText(R.string.add_widget)
-            setOnClickListener { requestPinWidget() }
-        }
-        val note = TextView(this).apply {
-            text = if (sensor.isAvailable) getString(R.string.calibrate_hint) else getString(R.string.no_sensor)
-            setTextColor(gray)
-            gravity = Gravity.CENTER
-            setPadding(0, dp(12), 0, 0)
-        }
-
         val settingsButton = Button(this).apply {
             setText(R.string.settings)
             setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
         }
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(8), dp(16), dp(64))
+            setPadding(dp(16), dp(4), dp(16), dp(8))
             addView(statusText, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
             addView(pinButton, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-            addView(pinsTitle, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
             addView(pinsContainer, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-            addView(backgroundButton, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-            addView(floatingButton, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-            addView(addWidget, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-            addView(note, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-            addView(settingsButton, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        }
+        val bottomRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), dp(4), dp(16), dp(24))
+            addView(floatingButton, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+            addView(settingsButton, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         }
         compassTab = Button(this).apply {
             setText(R.string.tab_compass)
@@ -137,6 +110,7 @@ class MainActivity : Activity() {
             addView(tabs, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
             addView(viewFrame, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
             addView(ScrollView(this@MainActivity).apply { addView(content) }, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
+            addView(bottomRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
         setContentView(root)
         showView(radar = getSharedPreferences("ui", MODE_PRIVATE).getBoolean("radar", false))
@@ -155,8 +129,6 @@ class MainActivity : Activity() {
         updateFloatingButton()
         updateStatus()
         refreshPins()
-        backgroundButton.visibility =
-            if (Permissions.hasFine(this) && !Permissions.hasBackground(this)) View.VISIBLE else View.GONE
     }
 
     override fun onPause() {
@@ -186,6 +158,7 @@ class MainActivity : Activity() {
     private fun updateStatus() {
         val loc = navigator.location
         statusText.text = when {
+            !sensor.isAvailable -> getString(R.string.no_sensor)
             !Permissions.hasFine(this) -> getString(R.string.loc_off)
             loc == null -> getString(R.string.loc_waiting)
             navigator.isGps -> getString(R.string.loc_accuracy, loc.accuracy.roundToInt())
@@ -345,15 +318,6 @@ class MainActivity : Activity() {
         startForegroundService(Intent(this, FloatingCompassService::class.java))
         floatingButton.setText(R.string.floating_stop)
         moveTaskToBack(true) // drop to the previous app so the bubble is visible right away
-    }
-
-    private fun requestPinWidget() {
-        val mgr = getSystemService(AppWidgetManager::class.java)
-        if (mgr.isRequestPinAppWidgetSupported) {
-            mgr.requestPinAppWidget(ComponentName(this, CompassWidgetProvider::class.java), null, null)
-        } else {
-            Toast.makeText(this, R.string.add_widget_manual, Toast.LENGTH_LONG).show()
-        }
     }
 
     companion object {
