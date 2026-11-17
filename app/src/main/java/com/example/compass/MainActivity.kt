@@ -12,6 +12,9 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -290,10 +293,14 @@ class MainActivity : Activity() {
             .show()
     }
 
+    private fun colorItems(): Array<CharSequence> = PinStore.PALETTE.map { (name, color) ->
+        SpannableString("●  $name").apply { setSpan(ForegroundColorSpan(color), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
+    }.toTypedArray()
+
     private fun pickColor(pin: Pin) {
         AlertDialog.Builder(this)
             .setTitle(R.string.change_color)
-            .setItems(PinStore.PALETTE.map { it.first }.toTypedArray()) { _, i ->
+            .setItems(colorItems()) { _, i ->
                 PinStore.update(this, pin.copy(color = PinStore.PALETTE[i].second))
                 pinsChanged()
             }

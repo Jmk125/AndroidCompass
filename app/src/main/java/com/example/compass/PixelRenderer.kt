@@ -21,7 +21,6 @@ class PixelRenderer(context: Context) : StyleRenderer(context) {
 
     private val n = 64
     private val buf = IntArray(n * n)
-    private val bmp = Bitmap.createBitmap(n, n, Bitmap.Config.ARGB_8888)
     private val sharp = Paint().apply { isFilterBitmap = false; isAntiAlias = false; isDither = false }
     private val dst = RectF()
 
@@ -58,7 +57,8 @@ class PixelRenderer(context: Context) : StyleRenderer(context) {
     }
 
     private fun flush(c: Canvas, s: Float) {
-        bmp.setPixels(buf, 0, n, 0, 0, n, n)
+        // A new bitmap per layer: a hardware canvas reads it later, so a shared one would show only the last layer.
+        val bmp = Bitmap.createBitmap(buf, n, n, Bitmap.Config.ARGB_8888)
         val scale = max(1, floor(s / n).toInt())
         val size = (n * scale).toFloat()
         val o = (s - size) / 2f

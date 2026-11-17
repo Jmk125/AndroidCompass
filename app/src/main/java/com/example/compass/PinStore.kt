@@ -11,7 +11,7 @@ object PinStore {
     private const val PREFS = "pins"
     private const val KEY = "list"
 
-    /** Arrow colours (red is left out: it's the north marker). */
+    /** Arrow colours. Red comes last so new pins don't start out looking like the north marker. */
     val PALETTE: List<Pair<String, Int>> = listOf(
         "Yellow" to 0xFFFFD60A.toInt(),
         "Cyan" to 0xFF32D4E6.toInt(),
@@ -21,6 +21,7 @@ object PinStore {
         "Blue" to 0xFF4D8DFF.toInt(),
         "Purple" to 0xFFB07CFF.toInt(),
         "Lime" to 0xFFC6F135.toInt(),
+        "Red" to 0xFFE02424.toInt(),
     )
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
