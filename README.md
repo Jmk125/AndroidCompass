@@ -33,8 +33,8 @@ long-press to switch between heading-up and north-up. No map data or internet ne
 
 ## Styles
 **Settings** (button at the bottom of the main screen) switches the compass between
-Modern (default), Gothic, Pirate, Old Western and Pixel Art. The style applies to the
+Modern (default), Operation, Gothic, Pirate, Old Western and Pixel Art. The style applies to the
 app, the floating compass and the widget.
 
 Fonts bundled (SIL Open Font License 1.1): UnifrakturCook (Gothic), Pirata One (Pirate),
-Rye (Old Western), Silkscreen (Pixel Art).
+Rye (Old Western), Silkscreen (Pixel Art), Share Tech Mono (Operation).
