@@ -2,11 +2,9 @@ package com.example.compass
 
 import android.Manifest
 import android.app.Activity
-import android.app.AlertDialog
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
@@ -31,6 +29,8 @@ import kotlin.math.roundToInt
 
 class MainActivity : Activity() {
 
+    private lateinit var t: UiTheme
+    private lateinit var appliedStyle: CompassStyle
     private lateinit var compassView: CompassView
     private lateinit var radarView: RadarView
     private lateinit var compassTab: Button
@@ -47,6 +47,10 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        appliedStyle = StylePrefs.get(this)
+        t = UiTheme.of(this, appliedStyle)
+        t.applyWindow(this)
+
         compassView = CompassView(this)
         radarView = RadarView(this)
         sensor = HeadingSensor(this) {
@@ -61,57 +65,48 @@ class MainActivity : Activity() {
             refreshPins()
         }
 
-        val gray = 0xFF8A93A0.toInt()
-        statusText = TextView(this).apply { setTextColor(gray); gravity = Gravity.CENTER }
-        val pinButton = Button(this).apply {
-            setText(R.string.pin_here)
-            setOnClickListener { pinHere() }
-        }
+        statusText = TextView(this).apply { t.styleBody(this, 14f, muted = true); gravity = Gravity.CENTER }
+        val pinButton = t.newButton(this, getString(R.string.pin_here)) { pinHere() }
         pinsContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        floatingButton = Button(this).apply { setOnClickListener { toggleFloating() } }
-        val settingsButton = Button(this).apply {
-            setText(R.string.settings)
-            setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
+        floatingButton = t.newButton(this, "") { toggleFloating() }
+        val settingsButton = t.newButton(this, getString(R.string.settings)) {
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(4), dp(16), dp(8))
-            addView(statusText, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-            addView(pinButton, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-            addView(pinsContainer, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-        }
-        val bottomRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(16), dp(4), dp(16), dp(24))
-            addView(floatingButton, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
-            addView(settingsButton, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
-        }
-        compassTab = Button(this).apply {
-            setText(R.string.tab_compass)
-            setOnClickListener { showView(radar = false) }
-        }
-        radarTab = Button(this).apply {
-            setText(R.string.tab_radar)
-            setOnClickListener { showView(radar = true) }
-        }
+        compassTab = t.newButton(this, getString(R.string.tab_compass)) { showView(radar = false) }
+        radarTab = t.newButton(this, getString(R.string.tab_radar)) { showView(radar = true) }
+
         val tabs = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(16), 0, dp(16), 0)
-            addView(compassTab, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
-            addView(radarTab, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+            setPadding(dp(16), 0, dp(16), dp(6))
+            addView(compassTab, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { rightMargin = dp(6) })
+            addView(radarTab, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { leftMargin = dp(6) })
         }
         val viewFrame = FrameLayout(this).apply {
             addView(compassView, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
             addView(radarView, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(4), dp(16), dp(8))
+            addView(statusText, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dp(6) })
+            addView(pinButton, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            addView(pinsContainer, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        }
+        val bottomRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), dp(6), dp(16), 0)
+            addView(floatingButton, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { rightMargin = dp(6) })
+            addView(settingsButton, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { leftMargin = dp(6) })
+        }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(32), 0, 0)
+            setBackgroundColor(t.bg)
             addView(tabs, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
             addView(viewFrame, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
             addView(ScrollView(this@MainActivity).apply { addView(content) }, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
             addView(bottomRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
+        applySystemInsets(root, extraTop = dp(8), extraBottom = dp(12), extraSide = 0)
         setContentView(root)
         showView(radar = getSharedPreferences("ui", MODE_PRIVATE).getBoolean("radar", false))
 
@@ -124,6 +119,10 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        if (StylePrefs.get(this) != appliedStyle) {
+            recreate() // style was changed in Settings: rebuild the screen in the new look
+            return
+        }
         sensor.start()
         navigator.start()
         updateFloatingButton()
@@ -148,8 +147,8 @@ class MainActivity : Activity() {
     private fun showView(radar: Boolean) {
         radarView.visibility = if (radar) View.VISIBLE else View.GONE
         compassView.visibility = if (radar) View.GONE else View.VISIBLE
-        radarTab.alpha = if (radar) 1f else 0.5f
-        compassTab.alpha = if (radar) 0.5f else 1f
+        t.styleButton(this, radarTab, selected = radar)
+        t.styleButton(this, compassTab, selected = !radar)
         getSharedPreferences("ui", MODE_PRIVATE).edit().putBoolean("radar", radar).apply()
     }
 
@@ -189,12 +188,13 @@ class MainActivity : Activity() {
         if (navigator.isGps && loc.accuracy <= 30f) {
             savePin()
         } else {
-            AlertDialog.Builder(this)
-                .setTitle(R.string.weak_title)
-                .setMessage(getString(R.string.weak_message, loc.accuracy.roundToInt()))
-                .setPositiveButton(R.string.pin_anyway) { _, _ -> savePin() }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
+            ThemedDialog(this, t).show(
+                title = getString(R.string.weak_title),
+                message = getString(R.string.weak_message, loc.accuracy.roundToInt()),
+                positive = getString(R.string.pin_anyway),
+                onPositive = { savePin() },
+                negative = getString(android.R.string.cancel),
+            )
         }
     }
 
@@ -208,8 +208,8 @@ class MainActivity : Activity() {
         val pins = PinStore.load(this)
         if (pins.isEmpty()) {
             pinsContainer.addView(TextView(this).apply {
-                setText(R.string.no_pins)
-                setTextColor(0xFF8A93A0.toInt())
+                setText(R.string.no_pins); t.styleBody(this, 15f, muted = true)
+                setPadding(0, dp(10), 0, 0)
             })
             return
         }
@@ -221,16 +221,16 @@ class MainActivity : Activity() {
                 else -> "${formatDistance(status.distance)} · ${cardinalOf(status.trueBearing)}"
             }
             val swatch = View(this).apply {
-                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(pin.color) }
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL; setColor(pin.color); setStroke(dp(1), t.border)
+                }
             }
             val texts = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
+                addView(TextView(this@MainActivity).apply { text = pin.name; t.styleTitle(this, 18f) })
                 addView(TextView(this@MainActivity).apply {
-                    text = pin.name; textSize = 17f; setTextColor(0xFFFFFFFF.toInt())
-                })
-                addView(TextView(this@MainActivity).apply {
-                    text = subtitle; textSize = 14f
-                    setTextColor(if (status?.arrived == true) pin.color else 0xFF8A93A0.toInt())
+                    text = subtitle; t.styleBody(this, 14f, muted = true)
+                    if (status?.arrived == true) setTextColor(t.accent)
                 })
             }
             pinsContainer.addView(LinearLayout(this).apply {
@@ -248,55 +248,54 @@ class MainActivity : Activity() {
         if (meters < 1000f) "${meters.roundToInt()} m" else String.format("%.1f km", meters / 1000f)
 
     private fun showPinOptions(pin: Pin) {
-        AlertDialog.Builder(this)
-            .setTitle(pin.name)
-            .setItems(
-                arrayOf(getString(R.string.rename), getString(R.string.change_color), getString(R.string.delete))
-            ) { _, which ->
+        ThemedDialog(this, t).show(
+            title = pin.name,
+            items = listOf(getString(R.string.rename), getString(R.string.change_color), getString(R.string.delete)),
+            onItem = { which ->
                 when (which) {
                     0 -> promptName(pin.name) { PinStore.update(this, pin.copy(name = it)); pinsChanged() }
                     1 -> pickColor(pin)
-                    2 -> AlertDialog.Builder(this)
-                        .setMessage(getString(R.string.delete_confirm, pin.name))
-                        .setPositiveButton(R.string.delete) { _, _ -> PinStore.delete(this, pin.id); pinsChanged() }
-                        .setNegativeButton(android.R.string.cancel, null)
-                        .show()
+                    2 -> ThemedDialog(this, t).show(
+                        message = getString(R.string.delete_confirm, pin.name),
+                        positive = getString(R.string.delete),
+                        onPositive = { PinStore.delete(this, pin.id); pinsChanged() },
+                        negative = getString(android.R.string.cancel),
+                    )
                 }
-            }
-            .show()
+            },
+        )
     }
 
-    private fun colorItems(): Array<CharSequence> = PinStore.PALETTE.map { (name, color) ->
-        SpannableString("●  $name").apply { setSpan(ForegroundColorSpan(color), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
-    }.toTypedArray()
-
     private fun pickColor(pin: Pin) {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.change_color)
-            .setItems(colorItems()) { _, i ->
+        val items: List<CharSequence> = PinStore.PALETTE.map { (name, color) ->
+            SpannableString("●  $name").apply { setSpan(ForegroundColorSpan(color), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
+        }
+        ThemedDialog(this, t).show(
+            title = getString(R.string.change_color),
+            items = items,
+            onItem = { i ->
                 PinStore.update(this, pin.copy(color = PinStore.PALETTE[i].second))
                 pinsChanged()
-            }
-            .show()
+            },
+        )
     }
 
     private fun promptName(initial: String, onOk: (String) -> Unit) {
-        val edit = EditText(this).apply { setText(initial); setSelectAllOnFocus(true); setSingleLine() }
-        val frame = FrameLayout(this).apply {
-            setPadding(dp(20), dp(8), dp(20), 0)
-            addView(edit, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        val edit = EditText(this).apply {
+            setText(initial); setSelectAllOnFocus(true); setSingleLine()
+            typeface = t.body; setTextColor(t.text); textSize = 18f
+            backgroundTintList = ColorStateList.valueOf(t.accent)
         }
-        AlertDialog.Builder(this)
-            .setTitle(R.string.name_pin)
-            .setView(frame)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                onOk(edit.text.toString().trim().ifEmpty { initial })
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        ThemedDialog(this, t).show(
+            title = getString(R.string.name_pin),
+            body = edit,
+            positive = getString(android.R.string.ok),
+            onPositive = { onOk(edit.text.toString().trim().ifEmpty { initial }) },
+            negative = getString(android.R.string.cancel),
+        )
     }
 
-    // ---------- floating compass & widget ----------
+    // ---------- floating compass ----------
 
     private fun updateFloatingButton() {
         floatingButton.setText(

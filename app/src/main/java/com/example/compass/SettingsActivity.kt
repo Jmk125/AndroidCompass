@@ -3,110 +3,90 @@ package com.example.compass
 import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
-import android.widget.Button
-import android.widget.Toast
 import android.content.Context
+import android.content.Intent
 import android.graphics.Canvas
-import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 
-/** Pick the compass style. Applies to the app, the floating compass and the widget. */
+/** Pick the compass style (which also styles the whole app), and set up the widget. */
 class SettingsActivity : Activity() {
 
-    private lateinit var rows: Map<CompassStyle, LinearLayout>
+    private lateinit var t: UiTheme
     private lateinit var backgroundButton: Button
-    private val accent = 0xFFFF5A4D.toInt()
-    private val gray = 0xFF8A93A0.toInt()
 
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        t = UiTheme.of(this)
+        t.applyWindow(this)
+        val current = StylePrefs.get(this)
 
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(48), dp(16), dp(48))
+            setPadding(dp(16), dp(8), dp(16), dp(24))
         }
-        column.addView(TextView(this).apply {
-            setText(R.string.settings)
-            setTextColor(0xFFFFFFFF.toInt()); textSize = 28f
-        })
-        column.addView(TextView(this).apply {
-            setText(R.string.compass_style)
-            setTextColor(0xFFFFFFFF.toInt()); textSize = 18f
-            setPadding(0, dp(20), 0, dp(2))
-        })
-        column.addView(TextView(this).apply {
-            setText(R.string.compass_style_hint)
-            setTextColor(gray)
-            setPadding(0, 0, 0, dp(12))
-        })
+        fun heading(textRes: Int, topDp: Int) = TextView(this).apply {
+            setText(textRes); t.styleTitle(this, 20f); setPadding(0, dp(topDp), 0, dp(2))
+        }
+        fun muted(textRes: Int, bottomDp: Int) = TextView(this).apply {
+            setText(textRes); t.styleBody(this, 14f, muted = true); setPadding(0, 0, 0, dp(bottomDp))
+        }
 
-        val built = LinkedHashMap<CompassStyle, LinearLayout>()
+        column.addView(TextView(this).apply { setText(R.string.settings); t.styleTitle(this, 30f) })
+        column.addView(heading(R.string.compass_style, 18))
+        column.addView(muted(R.string.compass_style_hint, 12))
+
         for (style in CompassStyle.values()) {
-            val preview = StylePreview(this, style)
+            val selected = style == current
             val texts = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                addView(TextView(this@SettingsActivity).apply {
-                    text = style.label; textSize = 20f; setTextColor(0xFFFFFFFF.toInt())
-                })
-                addView(TextView(this@SettingsActivity).apply {
-                    text = style.blurb; textSize = 14f; setTextColor(gray)
-                })
+                addView(TextView(this@SettingsActivity).apply { text = style.label; t.styleTitle(this, 21f) })
+                addView(TextView(this@SettingsActivity).apply { text = style.blurb; t.styleBody(this, 14f, muted = true) })
             }
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(10), dp(10), dp(10), dp(10))
+                background = t.box(this@SettingsActivity, t.surface, if (selected) t.accent else t.border, if (selected) 3 else 1)
                 setOnClickListener { choose(style) }
-                addView(preview, LinearLayout.LayoutParams(dp(104), dp(104)).apply { rightMargin = dp(14) })
+                addView(StylePreview(this@SettingsActivity, style), LinearLayout.LayoutParams(dp(104), dp(104)).apply { rightMargin = dp(14) })
                 addView(texts, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
             }
             column.addView(row, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dp(10) })
-            built[style] = row
         }
-        rows = built
 
-        column.addView(TextView(this).apply {
-            setText(R.string.widget_section)
-            setTextColor(0xFFFFFFFF.toInt()); textSize = 18f
-            setPadding(0, dp(20), 0, dp(2))
-        })
-        column.addView(TextView(this).apply {
-            setText(R.string.widget_hint)
-            setTextColor(gray)
-            setPadding(0, 0, 0, dp(8))
-        })
-        column.addView(Button(this).apply {
-            setText(R.string.add_widget)
-            setOnClickListener { requestPinWidget() }
-        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-        backgroundButton = Button(this).apply {
-            setText(R.string.pins_on_widget)
-            setOnClickListener {
-                Toast.makeText(this@SettingsActivity, R.string.pins_on_widget_hint, Toast.LENGTH_LONG).show()
-                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
-            }
+        column.addView(heading(R.string.widget_section, 16))
+        column.addView(muted(R.string.widget_hint, 8))
+        column.addView(t.newButton(this, getString(R.string.add_widget)) { requestPinWidget() },
+            LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        backgroundButton = t.newButton(this, getString(R.string.pins_on_widget)) {
+            Toast.makeText(this, R.string.pins_on_widget_hint, Toast.LENGTH_LONG).show()
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
         }
-        column.addView(backgroundButton, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        column.addView(backgroundButton, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(8) })
         column.addView(TextView(this).apply {
-            setText(R.string.calibrate_hint)
-            setTextColor(gray)
-            setPadding(0, dp(20), 0, 0)
+            setText(R.string.calibrate_hint); t.styleBody(this, 14f, muted = true); setPadding(0, dp(20), 0, 0)
         })
 
-        setContentView(ScrollView(this).apply { addView(column) })
-        refresh()
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(t.bg)
+            clipToPadding = false
+            addView(column)
+        }
+        applySystemInsets(scroll, extraTop = dp(8), extraBottom = dp(8), extraSide = 0)
+        setContentView(scroll)
     }
 
     override fun onResume() {
@@ -116,29 +96,19 @@ class SettingsActivity : Activity() {
             if (Permissions.hasFine(this) && !Permissions.hasBackground(this)) View.VISIBLE else View.GONE
     }
 
+    private fun choose(style: CompassStyle) {
+        if (style == StylePrefs.get(this)) return
+        StylePrefs.set(this, style)
+        CompassWidgetProvider.update(this) // restyle any widget already on the home screen
+        recreate() // rebuild this screen in the new look
+    }
+
     private fun requestPinWidget() {
         val mgr = getSystemService(AppWidgetManager::class.java)
         if (mgr.isRequestPinAppWidgetSupported) {
             mgr.requestPinAppWidget(ComponentName(this, CompassWidgetProvider::class.java), null, null)
         } else {
             Toast.makeText(this, R.string.add_widget_manual, Toast.LENGTH_LONG).show()
-        }
-    }
-
-    private fun choose(style: CompassStyle) {
-        StylePrefs.set(this, style)
-        CompassWidgetProvider.update(this) // restyle any widget already on the home screen
-        refresh()
-    }
-
-    private fun refresh() {
-        val current = StylePrefs.get(this)
-        for ((style, row) in rows) {
-            row.background = GradientDrawable().apply {
-                cornerRadius = dp(12).toFloat()
-                setColor(0xFF14171C.toInt())
-                setStroke(dp(if (style == current) 3 else 1), if (style == current) accent else 0xFF2A303A.toInt())
-            }
         }
     }
 

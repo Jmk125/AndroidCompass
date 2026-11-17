@@ -1,6 +1,7 @@
 package com.example.compass
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -26,6 +27,23 @@ class RadarView(context: Context) : View(context) {
 
     var hasLocation: Boolean = false
         set(value) { field = value; invalidate() }
+
+    private var theme = UiTheme.of(context)
+    private val prefs = context.getSharedPreferences(StylePrefs.PREFS, Context.MODE_PRIVATE)
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == StylePrefs.KEY) { theme = UiTheme.of(context); invalidate() }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        theme = UiTheme.of(context)
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
+    }
+
+    override fun onDetachedFromWindow() {
+        prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
+        super.onDetachedFromWindow()
+    }
 
     private var headingUp = true
     private var zoomIndex = -1 // -1 = auto-fit to the farthest pin
@@ -66,6 +84,13 @@ class RadarView(context: Context) : View(context) {
     }
 
     override fun onDraw(canvas: Canvas) {
+        val c = theme.radar
+        bg.color = c.disc; ring.color = c.ring; grid.color = c.grid
+        text.color = c.text; textOutline.color = c.disc; gray.color = c.muted
+        north.color = c.north; you.color = c.you; youOutline.color = c.disc
+        text.typeface = theme.radarFont; textOutline.typeface = theme.radarFont
+        gray.typeface = theme.radarFont; north.typeface = theme.radarFont
+
         val w = width.toFloat()
         val h = height.toFloat()
         val cx = w / 2f
